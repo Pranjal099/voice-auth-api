@@ -7,8 +7,6 @@ import soundfile as sf
 from aasist.models.AASIST import Model
 from aasist.data_utils import pad
 
-print("Loading AASIST...")
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CONFIG = {
@@ -27,8 +25,6 @@ CONFIG = {
     "temperatures": [2.0, 2.0, 100.0, 100.0]
 }
 
-model = Model(CONFIG)
-
 MODEL_PATH = os.path.join(
     BASE_DIR,
     "aasist",
@@ -37,28 +33,46 @@ MODEL_PATH = os.path.join(
     "AASIST.pth"
 )
 
-checkpoint = torch.load(
-    MODEL_PATH,
-    map_location="cpu"
-)
-
-if isinstance(checkpoint, dict):
-    if "state_dict" in checkpoint:
-        checkpoint = checkpoint["state_dict"]
-    elif "model" in checkpoint:
-        checkpoint = checkpoint["model"]
-
-model.load_state_dict(checkpoint)
-model.eval()
-
 device = torch.device("cpu")
-model.to(device)
 
-print("AASIST Loaded Successfully")
+# Lazy-loaded model
+model = None
+
+
+def get_model():
+    global model
+
+    if model is None:
+
+        print("Loading AASIST...")
+
+        model = Model(CONFIG)
+
+        checkpoint = torch.load(
+            MODEL_PATH,
+            map_location="cpu"
+        )
+
+        if isinstance(checkpoint, dict):
+            if "state_dict" in checkpoint:
+                checkpoint = checkpoint["state_dict"]
+            elif "model" in checkpoint:
+                checkpoint = checkpoint["model"]
+
+        model.load_state_dict(checkpoint)
+
+        model.eval()
+        model.to(device)
+
+        print("AASIST Loaded Successfully")
+
+    return model
 
 
 @torch.no_grad()
 def detect_spoof(audio_path):
+
+    model = get_model()
 
     start = time.time()
 

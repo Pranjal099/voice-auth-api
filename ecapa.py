@@ -5,8 +5,6 @@ import soundfile as sf
 
 from speechbrain.inference.speaker import SpeakerRecognition
 
-print("Loading Fine-tuned ECAPA...")
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 CHECKPOINT = os.path.join(
@@ -15,27 +13,42 @@ CHECKPOINT = os.path.join(
     "voicepay_best_epoch_40_eer_3.60.pth"
 )
 
-verification = SpeakerRecognition.from_hparams(
-    source="speechbrain/spkrec-ecapa-voxceleb",
-    savedir=os.path.join(BASE_DIR, "pretrained_models")
-)
+# Lazy-loaded model
+verification = None
 
-checkpoint = torch.load(
-    CHECKPOINT,
-    map_location="cpu"
-)
 
-verification.mods.embedding_model.load_state_dict(
-    checkpoint,
-    strict=True
-)
+def get_verification():
+    global verification
 
-verification.eval()
+    if verification is None:
 
-print("ECAPA Loaded Successfully")
+        print("Loading Fine-tuned ECAPA...")
+
+        verification = SpeakerRecognition.from_hparams(
+            source="speechbrain/spkrec-ecapa-voxceleb",
+            savedir=os.path.join(BASE_DIR, "pretrained_models")
+        )
+
+        checkpoint = torch.load(
+            CHECKPOINT,
+            map_location="cpu"
+        )
+
+        verification.mods.embedding_model.load_state_dict(
+            checkpoint,
+            strict=True
+        )
+
+        verification.eval()
+
+        print("ECAPA Loaded Successfully")
+
+    return verification
 
 
 def verify_speaker(enrollment_path, test_path, threshold=0.75):
+
+    verification = get_verification()
 
     start = time.time()
 
