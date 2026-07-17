@@ -1,4 +1,14 @@
 import os
+import psutil
+
+def log_memory(stage):
+    process = psutil.Process(os.getpid())
+    print(
+        f"[{stage}] RAM = "
+        f"{process.memory_info().rss / 1024 / 1024:.2f} MB"
+    )
+import os
+import gc
 import time
 import torch
 import torchaudio
@@ -35,8 +45,17 @@ MODEL_PATH = os.path.join(
 
 device = torch.device("cpu")
 
-# Lazy-loaded model
+# Lazy loaded model
 model = None
+
+# Reuse resampler
+_resamplers = {}
+
+
+def get_resampler(sr):
+    if sr not in _resamplers:
+        _resamplers[sr] = torchaudio.transforms.Resample(sr, 16000)
+    return _resamplers[sr]
 
 
 def get_model():
@@ -61,15 +80,33 @@ def get_model():
 
         model.load_state_dict(checkpoint)
 
+        # Free checkpoint memory
+        del checkpoint
+        gc.collect()
+
         model.eval()
         model.to(device)
 
         print("AASIST Loaded Successfully")
+        log_memory("Before AASIST")
 
+        model = Model(CONFIG)
+
+        log_memory("After model")
+
+        checkpoint = torch.load(...)
+
+        log_memory("After checkpoint")
+
+        model.load_state_dict(...)
+
+        del checkpoint
+        gc.collect()
+
+        log_memory("After cleanup")
     return model
 
 
-@torch.no_grad()
 def detect_spoof(audio_path):
 
     model = get_model()
@@ -87,11 +124,7 @@ def detect_spoof(audio_path):
     )
 
     if sr != 16000:
-        resampler = torchaudio.transforms.Resample(
-            sr,
-            16000
-        )
-        waveform = resampler(
+        waveform = get_resampler(sr)(
             waveform.unsqueeze(0)
         ).squeeze(0)
 
@@ -104,11 +137,10 @@ def detect_spoof(audio_path):
 
     waveform = torch.FloatTensor(
         waveform
-    ).unsqueeze(0)
+    ).unsqueeze(0).to(device)
 
-    waveform = waveform.to(device)
-
-    _, logits = model(waveform)
+    with torch.inference_mode():
+        _, logits = model(waveform)
 
     prediction = torch.argmax(
         logits,
@@ -116,6 +148,11 @@ def detect_spoof(audio_path):
     ).item()
 
     latency = round(time.time() - start, 3)
+
+    # Free temporary tensors
+    del waveform
+    del logits
+    gc.collect()
 
     return {
         "success": True,
