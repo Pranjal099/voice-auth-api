@@ -1,13 +1,5 @@
 import os
-import psutil
 import resource
-def log_memory(stage):
-    process = psutil.Process(os.getpid())
-    print(
-        f"[{stage}] RAM = "
-        f"{process.memory_info().rss / 1024 / 1024:.2f} MB"
-    )
-import os
 import time
 import gc
 import torch

@@ -1,12 +1,5 @@
 import os
-import psutil
 
-def log_memory(stage):
-    process = psutil.Process(os.getpid())
-    print(
-        f"[{stage}] RAM = "
-        f"{process.memory_info().rss / 1024 / 1024:.2f} MB"
-    )
 import os
 import gc
 import time
@@ -88,22 +81,6 @@ def get_model():
         model.to(device)
 
         print("AASIST Loaded Successfully")
-        log_memory("Before AASIST")
-
-        model = Model(CONFIG)
-
-        log_memory("After model")
-
-        checkpoint = torch.load(...)
-
-        log_memory("After checkpoint")
-
-        model.load_state_dict(...)
-
-        del checkpoint
-        gc.collect()
-
-        log_memory("After cleanup")
     return model
 
 
